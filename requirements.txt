@@ -1,0 +1,10 @@
+pandas
+numpy
+matplotlib
+seaborn
+arabic_reshaper
+python-bidi
+pyarrow
+hazm
+pyyaml
+tqdm
