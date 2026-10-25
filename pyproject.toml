@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ragsearch"
+version = "0.1.0"
+description = "Persian e-commerce product retrieval: text dual-encoder, image embeddings and a Gradio demo."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "pyarrow",
+    "pyyaml",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+# Persian text normalisation; only `ragsearch preprocess` needs it. hazm pins numpy==1.24.3, which has no wheels
+# for Python >= 3.12, is not importable by pyarrow >= 21 (hence that pin) and clashes with current torch builds.
+# Install it in its own environment (Python 3.10/3.11), NOT together with the `ml` extra.
+preprocess = ["hazm>=0.10", "pyarrow<21"]
+# Training, evaluation and the demo app.
+ml = [
+    "torch",
+    "transformers>=4.56",  # DINOv3 / SigLIP2 (NaFlex) support, `eval_strategy` argument
+    "accelerate>=1.1",  # required by transformers.Trainer
+    "scikit-learn",
+    "sentence-transformers",
+    "pillow",
+    "sentencepiece",  # AutoProcessor for SigLIP also builds a text tokenizer ...
+    "protobuf",  # ... which needs these two
+    "faiss-cpu",  # on a CUDA machine install `faiss-gpu-cu12` instead
+    "matplotlib",
+]
+app = ["gradio"]
+# Only needed to re-run notebooks/01_eda.ipynb.
+eda = [
+    "matplotlib",
+    "seaborn",
+    "arabic_reshaper",
+    "python-bidi",
+    "ipykernel",
+]
+dev = ["pytest"]
+all = ["ragsearch[ml,app,eda,dev]"]  # everything except `preprocess`
+
+[project.scripts]
+ragsearch = "ragsearch.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

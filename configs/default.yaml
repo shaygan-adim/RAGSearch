@@ -1,0 +1,118 @@
+# Single configuration file for every pipeline stage.
+# Relative paths are resolved from the directory you run `ragsearch` in (the repo root).
+# Defaults in src/ragsearch/config.py mirror this file; keep them in sync (tests check it).
+
+paths:
+  raw_data_dir: data/raw                 # input: *.parquet tables (see data/README.md)
+  processed_data_dir: data/processed     # output of `ragsearch preprocess`
+  image_dir: data/images                 # <random_key>.jpg, one per product (image experiments + demo)
+  mlm_model_dir: artifacts/mlm_model     # output of `ragsearch mlm`
+  checkpoint_path: artifacts/retrieval_system_full.pth   # output of `ragsearch contrastive`
+  results_dir: results
+
+preprocessing:
+  query_text:
+    append_category: false     # true: "<query><separator><category name>"
+    separator: " "
+  product_text:                # text is built as: name [+ category] [+ brand]
+    include_category: false
+    include_brand: true        # brand_id == -1 means "no brand" and is never appended
+    separator: " "
+  min_query_length: 2          # drop queries shorter than this after cleaning
+  hazm_normalize: true
+
+# Text dual-encoder architecture; shared by training, evaluation and the demo app.
+model:
+  max_length: 64
+  projection_dim: 128
+  dropout: 0.1
+
+# Stage 1: masked-language-model domain adaptation (50% queries / 50% products).
+mlm:
+  base_model_id: HooshvareLab/distilbert-fa-zwnj-base
+  output_dir: artifacts/mlm_checkpoints
+  test_size: 0.1
+  max_length: 128
+  mlm_probability: 0.15
+  batch_size: 32
+  learning_rate: 2.0e-5
+  num_train_epochs: 3
+  weight_decay: 0.01
+  warmup_ratio: 0.06
+  save_total_limit: 2
+  logging_steps: 100
+  seed: 42
+
+# Stage 2: dual-encoder contrastive training (+ auxiliary category classification).
+contrastive:
+  base_model: null                       # null -> paths.mlm_model_dir
+  test_size: 0.1
+  val_size: 0.1
+  seed: 42
+  neg_shown_not_clicked_ratio: 0.4       # negative = shown for this query but never viewed
+  neg_same_category_ratio: 0.3           # negative = random product of the positive's category
+                                         # remainder (0.3) = random product from the whole catalogue
+  batch_size: 32
+  val_batch_size: 64
+  num_epochs: 5
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+  temperature: 0.07
+  lambda_cls: 0.1
+  log_steps: 50
+
+# Stage 3a: text-only retrieval evaluation / model selection (query -> product text).
+text_eval:
+  k_values: [3, 5, 10, 20, 40]
+  batch_size: 64
+  index_batch_size: 10000
+  query_subset_ratio: 0.5
+  test_size: 0.5
+  seed: 42
+  use_faiss_gpu: true
+  experiments:
+    - name: Heydari-Persian-Emb
+      type: sentence_transformer
+      path: heydariAI/persian-embeddings
+      pooling: default
+      max_length: null                   # keep the model's own default
+    - name: Hooshvare-DistilBert
+      type: hf_automodel
+      path: HooshvareLab/distilbert-fa-zwnj-base
+      pooling: cls
+      max_length: 64
+    - name: Custom-MLM-Base
+      type: hf_automodel
+      path: artifacts/mlm_model          # keep in sync with paths.mlm_model_dir
+      pooling: cls
+      max_length: 64
+    - name: Custom-Dual-Contrastive
+      type: custom_dual
+      path: artifacts/retrieval_system_full.pth   # keep in sync with paths.checkpoint_path
+      base_path: artifacts/mlm_model
+      pooling: cls
+      max_length: 64
+
+# Stage 3b: image-only retrieval evaluation / model selection (product image -> product image).
+image_eval:
+  models:
+    clip: openai/clip-vit-base-patch16
+    convnextv2: facebook/convnextv2-base-22k-224
+    siglip2: google/siglip2-so400m-patch16-naflex
+    dinov3: facebook/dinov3-vits16-pretrain-lvd1689m   # gated on the HF Hub: needs HF_TOKEN
+  k_values: [3, 5, 10, 20, 40]
+  batch_size: 64
+  data_sample_fraction: 1.0
+  test_size: 0.5
+  augmentation_k: 5
+  seed: 42
+  use_faiss_gpu: true
+
+# Gradio demo (text -> product with the trained dual encoder, image -> product with SigLIP2).
+app:
+  text_base_model_id: HooshvareLab/distilbert-fa-zwnj-base
+  image_model_id: google/siglip2-so400m-patch16-naflex
+  batch_size: 32
+  top_k: 40
+  page_size: 10
+  use_faiss_gpu: true

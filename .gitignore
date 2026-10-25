@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Environments
+.venv/
+venv/
+.env
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Data, models and run outputs (too large / not redistributable; see data/README.md)
+/data/*
+!/data/README.md
+/artifacts/
+*.pth
+*.pt
+*.safetensors
+*.parquet
+*.faiss
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

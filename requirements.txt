@@ -1,10 +1,4 @@
-pandas
-numpy
-matplotlib
-seaborn
-arabic_reshaper
-python-bidi
-pyarrow
-hazm
-pyyaml
-tqdm
+# Single source of truth for dependencies is pyproject.toml.
+# Installs the package in editable mode with the ML/app/EDA/dev extras.
+# `ragsearch preprocess` needs hazm, which conflicts with these: use `pip install -e ".[preprocess]"` in a separate environment.
+-e .[all]
